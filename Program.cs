@@ -35,37 +35,43 @@ app.UseRateLimiter(
 
     }
     .AddConcurrencyLimiter("controllers"
-                        , new ConcurrencyLimiterOptions(1
-                        , QueueProcessingOrder.NewestFirst
-                        , 0))
+                        , options=>
+                        {
+                            options.QueueProcessingOrder = QueueProcessingOrder.NewestFirst;
+                            options.PermitLimit = 1;
+                            options.QueueLimit=0;
+                        })
     .AddTokenBucketLimiter("token"
-            , new TokenBucketRateLimiterOptions(tokenLimit: 5
-            , queueProcessingOrder: QueueProcessingOrder.NewestFirst
-            , queueLimit: 0
-            , replenishmentPeriod: TimeSpan.FromSeconds(5)
-            , tokensPerPeriod: 1
-            , autoReplenishment: false))
+            , options=>{
+                options.TokenLimit = 5;
+                options.QueueProcessingOrder = QueueProcessingOrder.NewestFirst;
+                options.QueueLimit = 0;
+                options.ReplenishmentPeriod = TimeSpan.FromSeconds(5);
+                options.TokensPerPeriod = 1;
+                options.AutoReplenishment = false;
+            })
     .AddPolicy(policyName: "token-policy", partitioner: httpContext =>
         {
             //Check if the request has any query string parameters.
             if (httpContext.Request.QueryString.HasValue)
             {
                 //If yes, let's don't have a rate limiting policy for this request.
-                return RateLimitPartition.CreateNoLimiter<string>("free");
+                return RateLimitPartition.GetNoLimiter<string>("free");
             }
             else
             {
                 //If no, let's have a rate limiting policy for this request.
-                return RateLimitPartition.CreateTokenBucketLimiter("token", key =>
-                    new TokenBucketRateLimiterOptions(tokenLimit: 5
-                        , queueProcessingOrder: QueueProcessingOrder.NewestFirst
-                        , queueLimit: 0
-                        , replenishmentPeriod: TimeSpan.FromSeconds(5)
-                        , tokensPerPeriod: 1
-                        , autoReplenishment: false));
+                return RateLimitPartition.GetTokenBucketLimiter("token", key =>
+                    new TokenBucketRateLimiterOptions(){
+                          TokenLimit = 5,
+                          QueueProcessingOrder = QueueProcessingOrder.NewestFirst,
+                          QueueLimit = 0,
+                          ReplenishmentPeriod = TimeSpan.FromSeconds(5),
+                          TokensPerPeriod = 1,
+                          AutoReplenishment = false
+                    });
             }
         })
-    .AddNoLimiter("free")
 );
 
 app.MapGet("/free", context =>
@@ -74,7 +80,7 @@ app.MapGet("/free", context =>
     context.Response.StatusCode = StatusCodes.Status200OK;
     return context.Response.WriteAsync("All free to call!");
 
-}).RequireRateLimiting("free");
+});
 
 app.MapGet("/hello", context =>
 {

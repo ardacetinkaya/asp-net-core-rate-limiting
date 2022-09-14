@@ -20,6 +20,7 @@ public class WeatherForecastController : ControllerBase
     }
 
     [HttpGet(Name = "GetWeatherForecast")]
+    [EnableRateLimitingAttribute("token")]
     public IEnumerable<WeatherForecast> Get()
     {
         return Enumerable.Range(1, 5).Select(index => new WeatherForecast
